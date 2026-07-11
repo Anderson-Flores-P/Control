@@ -1,0 +1,115 @@
+import { useEffect, useId, useRef, type FormEvent, type ReactNode } from 'react'
+import { X } from 'lucide-react'
+import { SEMANAS_POR_CICLO } from '../types'
+
+interface ModalProps {
+  open: boolean
+  title: string
+  onClose: () => void
+  children: ReactNode
+}
+
+export function Modal({ open, title, onClose, children }: ModalProps) {
+  const titleId = useId()
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    panelRef.current
+      ?.querySelector<HTMLElement>('input,select,textarea,button')
+      ?.focus()
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  if (!open) return null
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="presentation">
+      <div
+        ref={panelRef}
+        className="modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="modal-head">
+          <h2 id={titleId}>{title}</h2>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label="Cerrar"
+          >
+            <X size={18} />
+          </button>
+        </header>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+export function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children}
+    </label>
+  )
+}
+
+export function FormActions({
+  onCancel,
+  submitLabel = 'Guardar',
+}: {
+  onCancel: () => void
+  submitLabel?: string
+}) {
+  return (
+    <div className="form-actions">
+      <button type="button" className="btn ghost" onClick={onCancel}>
+        Cancelar
+      </button>
+      <button type="submit" className="btn primary">
+        {submitLabel}
+      </button>
+    </div>
+  )
+}
+
+export function SemanaSelect({
+  name = 'semana',
+  defaultValue = 1,
+  disabledWeeks = [],
+  label = 'Semana (1–20)',
+}: {
+  name?: string
+  defaultValue?: number
+  disabledWeeks?: number[]
+  label?: string
+}) {
+  const blocked = new Set(disabledWeeks)
+  return (
+    <Field label={label}>
+      <select name={name} defaultValue={defaultValue} required>
+        {Array.from({ length: SEMANAS_POR_CICLO }, (_, i) => {
+          const n = i + 1
+          const isBlocked = blocked.has(n)
+          return (
+            <option key={n} value={n} disabled={isBlocked}>
+              Semana {n}
+              {isBlocked ? ' (parcial)' : ''}
+            </option>
+          )
+        })}
+      </select>
+    </Field>
+  )
+}
+
+export type FormSubmit = (e: FormEvent<HTMLFormElement>) => void
