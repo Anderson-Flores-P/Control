@@ -682,4 +682,110 @@ export function gridPorMaterias(data: AppData, cicloId = data.activeCicloId) {
   return { days, rows }
 }
 
+export type PendingTipo = 'tarea' | 'foro' | 'corto' | 'otro' | 'parcial'
+
+export interface PendingItem {
+  id: string
+  tipo: PendingTipo
+  titulo: string
+  semana: number
+  status: ActivityStatus | Parcial['status']
+  materiaId: string
+  materiaNombre: string
+  materiaColor: string
+  origen?: string
+}
+
+export const PENDING_TIPO_LABEL: Record<PendingTipo, string> = {
+  tarea: 'Tarea',
+  foro: 'Foro',
+  corto: 'Corto',
+  otro: 'Otro',
+  parcial: 'Parcial',
+}
+
+const TIPO_ORDER: Record<PendingTipo, number> = {
+  tarea: 0,
+  foro: 1,
+  corto: 2,
+  otro: 3,
+  parcial: 4,
+}
+
+/**
+ * Actividades y parciales sin resolver del ciclo.
+ * Omite semanas bloqueadas por parcial (las actividades quedan desactivadas).
+ */
+export function pendientesCiclo(
+  data: AppData,
+  cicloId = data.activeCicloId,
+): PendingItem[] {
+  const mats = materiasDelCiclo(data, cicloId)
+  const byId = new Map(mats.map((m) => [m.id, m]))
+  const items: PendingItem[] = []
+
+  const pushActividad = (
+    tipo: Exclude<PendingTipo, 'parcial'>,
+    list: {
+      id: string
+      materiaId: string
+      semana: number
+      titulo: string
+      status: ActivityStatus
+      origen?: string
+    }[],
+  ) => {
+    for (const a of list) {
+      const m = byId.get(a.materiaId)
+      if (!m) continue
+      if (actividadResuelta(a.status)) continue
+      if (semanaTieneParcial(data, a.materiaId, a.semana)) continue
+      items.push({
+        id: a.id,
+        tipo,
+        titulo: a.titulo || PENDING_TIPO_LABEL[tipo],
+        semana: a.semana,
+        status: a.status,
+        materiaId: m.id,
+        materiaNombre: m.nombre,
+        materiaColor: m.color,
+        origen: a.origen,
+      })
+    }
+  }
+
+  pushActividad('tarea', data.tareas)
+  pushActividad('foro', data.foros)
+  pushActividad('corto', data.cortos ?? [])
+  pushActividad('otro', data.otros ?? [])
+
+  for (const p of data.parciales) {
+    const m = byId.get(p.materiaId)
+    if (!m) continue
+    if (p.status === 'rendido') continue
+    items.push({
+      id: p.id,
+      tipo: 'parcial',
+      titulo: p.titulo || 'Parcial',
+      semana: p.semana,
+      status: p.status,
+      materiaId: m.id,
+      materiaNombre: m.nombre,
+      materiaColor: m.color,
+    })
+  }
+
+  items.sort((a, b) => {
+    if (a.semana !== b.semana) return a.semana - b.semana
+    const mat = a.materiaNombre.localeCompare(b.materiaNombre, 'es')
+    if (mat !== 0) return mat
+    if (TIPO_ORDER[a.tipo] !== TIPO_ORDER[b.tipo]) {
+      return TIPO_ORDER[a.tipo] - TIPO_ORDER[b.tipo]
+    }
+    return a.titulo.localeCompare(b.titulo, 'es')
+  })
+
+  return items
+}
+
 export type { Tarea, Foro, Parcial, Materia }

@@ -3,6 +3,7 @@ import { useStore } from '../lib/store'
 import {
   formatLongDate,
   gridPorMaterias,
+  pendientesCiclo,
   semanaActualCiclo,
   statsCiclo,
   tiempoCiclo,
@@ -11,6 +12,7 @@ import {
 import { ProgressChart } from '../components/ProgressChart'
 import { ActivityGrid } from '../components/ActivityGrid'
 import { CycleTimePanel } from '../components/CycleTimePanel'
+import { PendingTasksPanel } from '../components/PendingTasksPanel'
 import type { ViewId } from '../types'
 
 interface PanelProps {
@@ -25,6 +27,7 @@ export function PanelView({ onNavigate, onOpenMateria }: PanelProps) {
   const grid = gridPorMaterias(data)
   const tiempo = tiempoCiclo(data)
   const semanaNow = semanaActualCiclo(activeCiclo.inicio, activeCiclo.fin)
+  const pendientes = pendientesCiclo(data)
   const today = formatLongDate()
 
   return (
@@ -94,6 +97,12 @@ export function PanelView({ onNavigate, onOpenMateria }: PanelProps) {
           </div>
         </div>
       </div>
+
+      <PendingTasksPanel
+        items={pendientes}
+        semanaActual={semanaNow}
+        onOpenMateria={onOpenMateria}
+      />
 
       <ProgressChart data={progress} />
       <ActivityGrid days={grid.days} rows={grid.rows} />

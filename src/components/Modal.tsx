@@ -12,18 +12,27 @@ interface ModalProps {
 export function Modal({ open, title, onClose, children }: ModalProps) {
   const titleId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
     }
     document.addEventListener('keydown', onKey)
-    panelRef.current
-      ?.querySelector<HTMLElement>('input,select,textarea,button')
-      ?.focus()
     return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const panel = panelRef.current
+    const focusTarget =
+      panel?.querySelector<HTMLElement>(
+        'input:not([type="hidden"]),select,textarea',
+      ) ?? panel?.querySelector<HTMLElement>('button')
+    focusTarget?.focus()
+  }, [open])
 
   if (!open) return null
 

@@ -30,6 +30,7 @@ interface StoreContextValue {
   updateCiclo: (id: string, patch: Partial<Ciclo>) => void
   addCiclo: (c: Omit<Ciclo, 'id'>) => void
   archiveCiclo: (id: string, archivado?: boolean) => void
+  deleteCiclo: (id: string) => { ok: true } | { ok: false; reason: string }
   duplicateCicloAsBackup: (id: string) => void
   addMateria: (m: Omit<Materia, 'id' | 'cicloId'> & { cicloId?: string }) => void
   updateMateria: (id: string, patch: Partial<Materia>) => void
@@ -125,10 +126,56 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const archiveCiclo = useCallback((id: string, archivado = true) => {
-    setData((d) => ({
-      ...d,
-      ciclos: d.ciclos.map((c) => (c.id === id ? { ...c, archivado } : c)),
-    }))
+    setData((d) => {
+      const ciclos = d.ciclos.map((c) => (c.id === id ? { ...c, archivado } : c))
+      let activeCicloId = d.activeCicloId
+      if (archivado && activeCicloId === id) {
+        const next =
+          ciclos.find((c) => !c.archivado && c.id !== id) ??
+          ciclos.find((c) => c.id !== id)
+        if (next) activeCicloId = next.id
+      }
+      return { ...d, ciclos, activeCicloId }
+    })
+  }, [])
+
+  const deleteCiclo = useCallback((id: string) => {
+    let result: { ok: true } | { ok: false; reason: string } = { ok: true }
+    setData((d) => {
+      if (d.ciclos.length <= 1) {
+        result = {
+          ok: false,
+          reason: 'No podés borrar el único ciclo. Creá otro antes de eliminar este.',
+        }
+        return d
+      }
+      if (!d.ciclos.some((c) => c.id === id)) {
+        result = { ok: false, reason: 'El ciclo no existe.' }
+        return d
+      }
+      const matIds = new Set(
+        d.materias.filter((m) => m.cicloId === id).map((m) => m.id),
+      )
+      const ciclos = d.ciclos.filter((c) => c.id !== id)
+      let activeCicloId = d.activeCicloId
+      if (activeCicloId === id) {
+        activeCicloId =
+          ciclos.find((c) => !c.archivado)?.id ?? ciclos[0]?.id ?? activeCicloId
+      }
+      return {
+        ...d,
+        activeCicloId,
+        ciclos,
+        materias: d.materias.filter((m) => m.cicloId !== id),
+        tareas: d.tareas.filter((t) => !matIds.has(t.materiaId)),
+        foros: d.foros.filter((f) => !matIds.has(f.materiaId)),
+        cortos: (d.cortos ?? []).filter((c) => !matIds.has(c.materiaId)),
+        otros: (d.otros ?? []).filter((o) => !matIds.has(o.materiaId)),
+        parciales: d.parciales.filter((p) => !matIds.has(p.materiaId)),
+        festividades: (d.festividades ?? []).filter((f) => f.cicloId !== id),
+      }
+    })
+    return result
   }, [])
 
   const duplicateCicloAsBackup = useCallback((id: string) => {
@@ -640,6 +687,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateCiclo,
       addCiclo,
       archiveCiclo,
+      deleteCiclo,
       duplicateCicloAsBackup,
       addMateria,
       updateMateria,
@@ -680,6 +728,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateCiclo,
       addCiclo,
       archiveCiclo,
+      deleteCiclo,
       duplicateCicloAsBackup,
       addMateria,
       updateMateria,

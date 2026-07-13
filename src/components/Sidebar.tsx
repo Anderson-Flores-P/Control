@@ -51,9 +51,11 @@ export function Sidebar({
             type="button"
             className={`nav-item${view === id ? ' active' : ''}`}
             onClick={() => onNavigate(id)}
+            title={label}
+            aria-label={label}
           >
             <Icon size={18} strokeWidth={1.75} />
-            <span>{label}</span>
+            <span>{label === 'Configuración' ? 'Config' : label}</span>
           </button>
         ))}
       </nav>
