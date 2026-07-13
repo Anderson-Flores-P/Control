@@ -81,7 +81,10 @@ export function CycleTimePanel({
               style={{ width: `${avanceAcademico}%` }}
             />
           </div>
-          <p className="time-caption">Foros, tareas y parciales completados</p>
+          <p className="time-caption">
+            Promedio del avance de cada semana (no salta a 100% con una sola
+            actividad)
+          </p>
         </div>
       </div>
 

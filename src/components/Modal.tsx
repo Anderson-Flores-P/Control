@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, type FormEvent, type ReactNode } from 'react'
 import { X } from 'lucide-react'
-import { SEMANAS_POR_CICLO } from '../types'
+import { SEMANAS_POR_DEFECTO } from '../types'
 
 interface ModalProps {
   open: boolean
@@ -86,18 +86,21 @@ export function SemanaSelect({
   name = 'semana',
   defaultValue = 1,
   disabledWeeks = [],
-  label = 'Semana (1–20)',
+  totalSemanas = SEMANAS_POR_DEFECTO,
+  label,
 }: {
   name?: string
   defaultValue?: number
   disabledWeeks?: number[]
+  totalSemanas?: number
   label?: string
 }) {
   const blocked = new Set(disabledWeeks)
+  const title = label ?? `Semana (1–${totalSemanas})`
   return (
-    <Field label={label}>
+    <Field label={title}>
       <select name={name} defaultValue={defaultValue} required>
-        {Array.from({ length: SEMANAS_POR_CICLO }, (_, i) => {
+        {Array.from({ length: totalSemanas }, (_, i) => {
           const n = i + 1
           const isBlocked = blocked.has(n)
           return (

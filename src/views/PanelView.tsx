@@ -19,7 +19,7 @@ interface PanelProps {
 }
 
 export function PanelView({ onNavigate, onOpenMateria }: PanelProps) {
-  const { data, activeCiclo, materiasActivas } = useStore()
+  const { data, activeCiclo, materiasActivas, semanasActivas } = useStore()
   const stats = statsCiclo(data)
   const progress = weeklyProgressCiclo(data)
   const grid = gridPorMaterias(data)
@@ -33,12 +33,14 @@ export function PanelView({ onNavigate, onOpenMateria }: PanelProps) {
         <div>
           <h2>Panel de control</h2>
           <p>
-            {activeCiclo.nombre} · control por materia · 20 semanas
+            {activeCiclo.nombre} · control por materia · {semanasActivas} semanas
             {activeCiclo.archivado ? ' · vista de respaldo' : ''}
           </p>
         </div>
         <div className="day-chip">
-          <span className="day-label">Semana {semanaNow}/20</span>
+          <span className="day-label">
+            Semana {semanaNow}/{semanasActivas}
+          </span>
           <span className="day-value">{today}</span>
         </div>
       </header>
@@ -69,9 +71,10 @@ export function PanelView({ onNavigate, onOpenMateria }: PanelProps) {
           <Target size={18} />
           <div>
             <strong>
-              {stats.tDone + stats.fDone}/{stats.tTotal + stats.fTotal}
+              {stats.tDone + stats.fDone + stats.cDone + stats.oDone}/
+              {stats.tTotal + stats.fTotal + stats.cTotal + stats.oTotal}
             </strong>
-            <span>Foros + tareas</span>
+            <span>Actividades</span>
           </div>
         </div>
         <div className="stat-card">

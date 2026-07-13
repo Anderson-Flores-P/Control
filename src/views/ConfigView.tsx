@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { useStore } from '../lib/store'
 import { Field } from '../components/Modal'
-import { SEMANAS_POR_CICLO } from '../types'
+import { semanasDeCiclo } from '../lib/stats'
 
 export function ConfigView() {
   const { activeCiclo, updateCiclo, resetData, setActiveCiclo, data } = useStore()
   const [saved, setSaved] = useState(false)
+  const weeks = semanasDeCiclo(activeCiclo)
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -24,7 +25,9 @@ export function ConfigView() {
       <header className="view-header">
         <div>
           <h2>Configuración</h2>
-          <p>Ciclo activo y datos locales ({SEMANAS_POR_CICLO} semanas por ciclo)</p>
+          <p>
+            Ciclo activo: {weeks} semana{weeks === 1 ? '' : 's'} según fechas de inicio/fin
+          </p>
         </div>
       </header>
 

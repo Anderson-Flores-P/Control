@@ -15,7 +15,7 @@ interface ProgressChartProps {
 
 export function ProgressChart({
   data,
-  titulo = 'Progreso por semana (1–20)',
+  titulo = 'Progreso por semana',
 }: ProgressChartProps) {
   return (
     <section className="chart-panel">

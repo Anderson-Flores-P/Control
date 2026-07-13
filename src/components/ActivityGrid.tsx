@@ -20,7 +20,7 @@ export function ActivityGrid({
   days,
   rows,
   title = 'Grilla por materia',
-  subtitle = 'Semanas 1–20 · punto = actividad · rombo = parcial',
+  subtitle = 'Semanas del ciclo · punto = actividad · rombo = parcial',
 }: ActivityGridProps) {
   return (
     <section className="grid-panel">

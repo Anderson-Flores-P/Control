@@ -8,10 +8,13 @@ import {
   MessageSquare,
   GraduationCap,
   CalendarRange,
+  Zap,
+  Layers2,
 } from 'lucide-react'
 import { useStore } from '../lib/store'
 import {
   actividadesDeMateria,
+  actividadCuentaEnAvance,
   diasClaseDe,
   diasClaseMateriaEnCiclo,
   formatDiasClase,
@@ -23,20 +26,28 @@ import {
 } from '../lib/stats'
 import { StatusBadge, ParcialBadge } from '../components/StatusBadge'
 import { Field, FormActions, Modal, SemanaSelect } from '../components/Modal'
+import {
+  ActivityStatusSelect,
+  CuentaEnAvanceField,
+  GradeFields,
+  parseCuentaEnAvance,
+  parseGradeFromForm,
+} from '../components/ActivityFields'
 import { DiasClasePicker } from '../components/DiasClasePicker'
 import {
   DIAS_CLASE_DEFAULT,
   MATERIA_COLORS,
-  SEMANAS_POR_CICLO,
   type ActivityStatus,
+  type Corto,
   type DiaSemana,
   type Foro,
   type Materia,
+  type Otro,
   type Parcial,
   type Tarea,
 } from '../types'
 
-type Tab = 'semanas' | 'tareas' | 'foros' | 'parciales'
+type Tab = 'semanas' | 'tareas' | 'foros' | 'cortos' | 'otros' | 'parciales'
 
 interface MateriasViewProps {
   selectedId: string | null
@@ -69,10 +80,6 @@ function MateriasList({
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (diasClase.length === 0) {
-      alert('Elegí al menos un día de clase para la materia.')
-      return
-    }
     const fd = new FormData(e.currentTarget)
     const payload = {
       nombre: String(fd.get('nombre')).trim(),
@@ -140,9 +147,12 @@ function MateriasList({
                   </li>
                   <li>
                     <strong>
-                      {s.pDone}/{s.pTotal}
+                      {s.cDone}/{s.cTotal}
                     </strong>{' '}
-                    parciales
+                    cortos
+                  </li>
+                  <li>
+                    <strong>{s.pct}%</strong> avance
                   </li>
                 </ul>
                 {s.blockedWeeks > 0 && (
@@ -245,6 +255,7 @@ function MateriaDetail({
   const {
     data,
     activeCiclo,
+    semanasActivas,
     addTarea,
     updateTarea,
     removeTarea,
@@ -253,6 +264,14 @@ function MateriaDetail({
     updateForo,
     removeForo,
     toggleForoStatus,
+    addCorto,
+    updateCorto,
+    removeCorto,
+    toggleCortoStatus,
+    addOtro,
+    updateOtro,
+    removeOtro,
+    toggleOtroStatus,
     addParcial,
     updateParcial,
     removeParcial,
@@ -261,14 +280,21 @@ function MateriaDetail({
   const [tab, setTab] = useState<Tab>('semanas')
   const [tareaOpen, setTareaOpen] = useState(false)
   const [foroOpen, setForoOpen] = useState(false)
+  const [cortoOpen, setCortoOpen] = useState(false)
+  const [otroOpen, setOtroOpen] = useState(false)
   const [parcialOpen, setParcialOpen] = useState(false)
   const [editTarea, setEditTarea] = useState<Tarea | null>(null)
   const [editForo, setEditForo] = useState<Foro | null>(null)
+  const [editCorto, setEditCorto] = useState<Corto | null>(null)
+  const [editOtro, setEditOtro] = useState<Otro | null>(null)
   const [editParcial, setEditParcial] = useState<Parcial | null>(null)
   const [error, setError] = useState('')
 
   const blocked = [...semanasBloqueadas(data, materia.id)]
-  const { tareas, foros, parciales } = actividadesDeMateria(data, materia.id)
+  const { tareas, foros, cortos, otros, parciales } = actividadesDeMateria(
+    data,
+    materia.id,
+  )
   const semanas = resumenSemanasMateria(data, materia.id)
   const s = statsMateria(data, materia.id)
   const dias = diasClaseDe(materia)
@@ -277,12 +303,16 @@ function MateriaDetail({
   const submitTarea = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
+    const { nota, notaMaxima } = parseGradeFromForm(fd)
     const payload = {
       materiaId: materia.id,
       titulo: String(fd.get('titulo')).trim(),
       descripcion: String(fd.get('descripcion')).trim(),
       semana: Number(fd.get('semana')),
       status: String(fd.get('status')) as ActivityStatus,
+      nota,
+      notaMaxima,
+      cuentaEnAvance: parseCuentaEnAvance(fd),
     }
     if (!payload.titulo) return
     const res = editTarea
@@ -299,12 +329,16 @@ function MateriaDetail({
   const submitForo = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
+    const { nota, notaMaxima } = parseGradeFromForm(fd)
     const payload = {
       materiaId: materia.id,
       titulo: String(fd.get('titulo')).trim(),
       descripcion: String(fd.get('descripcion')).trim(),
       semana: Number(fd.get('semana')),
       status: String(fd.get('status')) as ActivityStatus,
+      nota,
+      notaMaxima,
+      cuentaEnAvance: parseCuentaEnAvance(fd),
     }
     if (!payload.titulo) return
     const res = editForo ? updateForo(editForo.id, payload) : addForo(payload)
@@ -314,6 +348,57 @@ function MateriaDetail({
     }
     setError('')
     setForoOpen(false)
+  }
+
+  const submitCorto = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    const { nota, notaMaxima } = parseGradeFromForm(fd)
+    const payload = {
+      materiaId: materia.id,
+      titulo: String(fd.get('titulo')).trim(),
+      descripcion: String(fd.get('descripcion')).trim(),
+      semana: Number(fd.get('semana')),
+      status: String(fd.get('status')) as ActivityStatus,
+      nota,
+      notaMaxima,
+      cuentaEnAvance: parseCuentaEnAvance(fd),
+    }
+    if (!payload.titulo) return
+    const res = editCorto
+      ? updateCorto(editCorto.id, payload)
+      : addCorto(payload)
+    if (!res.ok) {
+      setError(res.reason)
+      return
+    }
+    setError('')
+    setCortoOpen(false)
+  }
+
+  const submitOtro = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    const { nota, notaMaxima } = parseGradeFromForm(fd)
+    const payload = {
+      materiaId: materia.id,
+      titulo: String(fd.get('titulo')).trim(),
+      descripcion: String(fd.get('descripcion')).trim(),
+      origen: String(fd.get('origen')).trim(),
+      semana: Number(fd.get('semana')),
+      status: String(fd.get('status')) as ActivityStatus,
+      nota,
+      notaMaxima,
+      cuentaEnAvance: parseCuentaEnAvance(fd),
+    }
+    if (!payload.titulo) return
+    const res = editOtro ? updateOtro(editOtro.id, payload) : addOtro(payload)
+    if (!res.ok) {
+      setError(res.reason)
+      return
+    }
+    setError('')
+    setOtroOpen(false)
   }
 
   const submitParcial = (e: FormEvent<HTMLFormElement>) => {
@@ -359,7 +444,7 @@ function MateriaDetail({
           <h2 style={{ marginTop: '0.4rem' }}>{materia.nombre}</h2>
           <p>
             {formatDiasClase(dias)} · {claseCiclo.transcurridos}/{claseCiclo.total} días de
-            clase · {s.pct}% avance
+            clase · {s.pct}% avance (promedio semanal)
           </p>
         </div>
       </header>
@@ -367,9 +452,11 @@ function MateriaDetail({
       <div className="filter-bar tabs">
         {(
           [
-            ['semanas', '20 Semanas', CalendarRange],
+            ['semanas', `${semanasActivas} Semanas`, CalendarRange],
             ['tareas', 'Tareas', CheckSquare],
             ['foros', 'Foros', MessageSquare],
+            ['cortos', 'Cortos', Zap],
+            ['otros', 'Otros', Layers2],
             ['parciales', 'Parciales', GraduationCap],
           ] as const
         ).map(([id, label, Icon]) => (
@@ -414,8 +501,15 @@ function MateriaDetail({
                   <li>
                     Foros {w.forosDone}/{w.foros}
                   </li>
+                  <li>
+                    Cortos {w.cortosDone}/{w.cortos}
+                  </li>
+                  <li>
+                    Otros {w.otrosDone}/{w.otros}
+                  </li>
                 </ul>
               )}
+              <p className="week-avance">{Math.round(w.avance * 100)}% semana</p>
               {w.parciales > 0 && (
                 <p className="week-parcial-count">{w.parciales} parcial</p>
               )}
@@ -451,6 +545,7 @@ function MateriaDetail({
                   <tr>
                     <th>Tarea</th>
                     <th>Semana</th>
+                    <th>Nota</th>
                     <th>Estado</th>
                     <th />
                   </tr>
@@ -486,6 +581,12 @@ function MateriaDetail({
                               <span className="lock-inline">
                                 <Lock size={12} />
                               </span>
+                            )}
+                          </td>
+                          <td className="mono">
+                            {t.nota !== null ? `${t.nota}/${t.notaMaxima}` : '—'}
+                            {!t.cuentaEnAvance && (
+                              <span className="chip-muted"> · Sin avance</span>
                             )}
                           </td>
                           <td>
@@ -582,7 +683,14 @@ function MateriaDetail({
                             <Lock size={12} /> Desactivado por parcial
                           </span>
                         ) : (
-                          <span>Activo</span>
+                          <span>
+                            {f.nota !== null
+                              ? `Nota ${f.nota}/${f.notaMaxima}`
+                              : 'Sin nota'}
+                            {!f.cuentaEnAvance && (
+                              <span className="chip-muted"> · Sin avance</span>
+                            )}
+                          </span>
                         )}
                         <button
                           type="button"
@@ -601,12 +709,182 @@ function MateriaDetail({
         </>
       )}
 
+      {tab === 'cortos' && (
+        <>
+          <div className="inline-actions">
+            <p className="hint-inline">
+              Llamados cortos: se mantienen registrados con nota. No cuentan en el
+              avance académico si ya hay tarea esa semana; si no hay tarea, sí
+              cuentan. Podés forzar el conteo al registrarlos.
+            </p>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => {
+                setEditCorto(null)
+                setError('')
+                setCortoOpen(true)
+              }}
+            >
+              <Plus size={16} /> Nuevo corto
+            </button>
+          </div>
+          {cortos.length === 0 ? (
+            <p className="empty-hint">Sin cortos. Son opcionales semana a semana.</p>
+          ) : (
+            <div className="card-list">
+              {cortos
+                .slice()
+                .sort((a, b) => a.semana - b.semana)
+                .map((c) => {
+                  const bloqueada = blocked.includes(c.semana)
+                  const st = statusEfectivo(c.status, bloqueada)
+                  const hayTarea = tareas.some((t) => t.semana === c.semana)
+                  const cuenta = actividadCuentaEnAvance(c, {
+                    esCorto: true,
+                    hayTareaEnSemana: hayTarea,
+                  })
+                  return (
+                    <article
+                      key={c.id}
+                      className={`activity-card${bloqueada ? ' blocked' : ''}`}
+                    >
+                      <div className="activity-card-top">
+                        <span className="mono">Semana {c.semana}</span>
+                        <button
+                          type="button"
+                          className="badge-btn"
+                          disabled={bloqueada}
+                          onClick={() => toggleCortoStatus(c.id)}
+                        >
+                          <StatusBadge status={st} />
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        className="linkish"
+                        disabled={bloqueada}
+                        onClick={() => {
+                          if (bloqueada) return
+                          setEditCorto(c)
+                          setError('')
+                          setCortoOpen(true)
+                        }}
+                      >
+                        <strong>{c.titulo}</strong>
+                        {c.descripcion && <span>{c.descripcion}</span>}
+                      </button>
+                      <footer className="activity-card-foot">
+                        <span>
+                          {c.nota !== null
+                            ? `Nota ${c.nota}/${c.notaMaxima}`
+                            : 'Sin nota'}
+                          {!cuenta && (
+                            <span className="chip-muted"> · Solo nota</span>
+                          )}
+                          {cuenta && !c.cuentaEnAvance && (
+                            <span className="chip-muted"> · Cuenta (sin tarea)</span>
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          className="icon-btn danger"
+                          onClick={() => removeCorto(c.id)}
+                          aria-label="Eliminar"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </footer>
+                    </article>
+                  )
+                })}
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === 'otros' && (
+        <>
+          <div className="inline-actions">
+            <p className="hint-inline">
+              Actividades extras (otra universidad u otro curso). No se bloquean por
+              parcial. Elegí si cuentan para el avance académico.
+            </p>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => {
+                setEditOtro(null)
+                setError('')
+                setOtroOpen(true)
+              }}
+            >
+              <Plus size={16} /> Nueva actividad
+            </button>
+          </div>
+          {otros.length === 0 ? (
+            <p className="empty-hint">Sin actividades extra.</p>
+          ) : (
+            <div className="card-list">
+              {otros
+                .slice()
+                .sort((a, b) => a.semana - b.semana)
+                .map((o) => (
+                  <article key={o.id} className="activity-card">
+                    <div className="activity-card-top">
+                      <span className="mono">Semana {o.semana}</span>
+                      <button
+                        type="button"
+                        className="badge-btn"
+                        onClick={() => toggleOtroStatus(o.id)}
+                      >
+                        <StatusBadge status={o.status} />
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      className="linkish"
+                      onClick={() => {
+                        setEditOtro(o)
+                        setError('')
+                        setOtroOpen(true)
+                      }}
+                    >
+                      <strong>{o.titulo}</strong>
+                      {o.descripcion && <span>{o.descripcion}</span>}
+                    </button>
+                    <footer className="activity-card-foot">
+                      <span>
+                        {o.origen || 'Sin origen'}
+                        {o.nota !== null
+                          ? ` · ${o.nota}/${o.notaMaxima}`
+                          : ''}
+                        {!o.cuentaEnAvance && (
+                          <span className="chip-muted"> · Sin avance</span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        className="icon-btn danger"
+                        onClick={() => removeOtro(o.id)}
+                        aria-label="Eliminar"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </footer>
+                  </article>
+                ))}
+            </div>
+          )}
+        </>
+      )}
+
       {tab === 'parciales' && (
         <>
           <div className="inline-actions">
             <p className="hint-inline">
-              Agregá parciales manualmente. Al asignar una semana, se desactivan foros y
-              tareas de esa semana en esta materia.
+              Agregá parciales manualmente. Al asignar una semana, se desactivan foros,
+              tareas y cortos de esa semana (otros no).
             </p>
             <button
               type="button"
@@ -689,14 +967,13 @@ function MateriaDetail({
           <SemanaSelect
             defaultValue={editTarea?.semana ?? 1}
             disabledWeeks={blocked}
+            totalSemanas={semanasActivas}
           />
-          <Field label="Estado">
-            <select name="status" defaultValue={editTarea?.status ?? 'pendiente'}>
-              <option value="pendiente">Pendiente</option>
-              <option value="en_progreso">En progreso</option>
-              <option value="completada">Completada</option>
-            </select>
-          </Field>
+          <ActivityStatusSelect defaultValue={editTarea?.status ?? 'pendiente'} />
+          <GradeFields nota={editTarea?.nota} notaMaxima={editTarea?.notaMaxima ?? 10} />
+          <CuentaEnAvanceField
+            defaultChecked={editTarea?.cuentaEnAvance ?? true}
+          />
           <Field label="Descripción">
             <textarea
               name="descripcion"
@@ -726,14 +1003,13 @@ function MateriaDetail({
           <SemanaSelect
             defaultValue={editForo?.semana ?? 1}
             disabledWeeks={blocked}
+            totalSemanas={semanasActivas}
           />
-          <Field label="Estado">
-            <select name="status" defaultValue={editForo?.status ?? 'pendiente'}>
-              <option value="pendiente">Pendiente</option>
-              <option value="en_progreso">En progreso</option>
-              <option value="completada">Completada</option>
-            </select>
-          </Field>
+          <ActivityStatusSelect defaultValue={editForo?.status ?? 'pendiente'} />
+          <GradeFields nota={editForo?.nota} notaMaxima={editForo?.notaMaxima ?? 10} />
+          <CuentaEnAvanceField
+            defaultChecked={editForo?.cuentaEnAvance ?? true}
+          />
           <Field label="Descripción">
             <textarea
               name="descripcion"
@@ -742,6 +1018,86 @@ function MateriaDetail({
             />
           </Field>
           <FormActions onCancel={() => setForoOpen(false)} />
+        </form>
+      </Modal>
+
+      <Modal
+        open={cortoOpen}
+        title={editCorto ? 'Editar corto' : 'Nuevo corto'}
+        onClose={() => setCortoOpen(false)}
+      >
+        <form className="form" onSubmit={submitCorto}>
+          {error && <p className="form-error">{error}</p>}
+          <Field label="Título">
+            <input
+              name="titulo"
+              required
+              defaultValue={editCorto?.titulo ?? ''}
+              placeholder="Ej. Corto unidad 2"
+            />
+          </Field>
+          <SemanaSelect
+            defaultValue={editCorto?.semana ?? 1}
+            disabledWeeks={blocked}
+            totalSemanas={semanasActivas}
+          />
+          <ActivityStatusSelect defaultValue={editCorto?.status ?? 'pendiente'} />
+          <GradeFields nota={editCorto?.nota} notaMaxima={editCorto?.notaMaxima ?? 10} />
+          <CuentaEnAvanceField
+            defaultChecked={editCorto?.cuentaEnAvance ?? false}
+            hint="Por defecto no. Si no hay tarea esa semana, cuenta igual aunque esté desmarcado."
+          />
+          <Field label="Descripción">
+            <textarea
+              name="descripcion"
+              rows={2}
+              defaultValue={editCorto?.descripcion ?? ''}
+            />
+          </Field>
+          <FormActions onCancel={() => setCortoOpen(false)} />
+        </form>
+      </Modal>
+
+      <Modal
+        open={otroOpen}
+        title={editOtro ? 'Editar actividad' : 'Nueva actividad (otros)'}
+        onClose={() => setOtroOpen(false)}
+      >
+        <form className="form" onSubmit={submitOtro}>
+          {error && <p className="form-error">{error}</p>}
+          <Field label="Título">
+            <input
+              name="titulo"
+              required
+              defaultValue={editOtro?.titulo ?? ''}
+              placeholder="Actividad extra"
+            />
+          </Field>
+          <Field label="Origen (opc.)">
+            <input
+              name="origen"
+              defaultValue={editOtro?.origen ?? ''}
+              placeholder="Otra universidad / curso"
+            />
+          </Field>
+          <SemanaSelect
+            defaultValue={editOtro?.semana ?? 1}
+            disabledWeeks={[]}
+            totalSemanas={semanasActivas}
+          />
+          <ActivityStatusSelect defaultValue={editOtro?.status ?? 'pendiente'} />
+          <GradeFields nota={editOtro?.nota} notaMaxima={editOtro?.notaMaxima ?? 10} />
+          <CuentaEnAvanceField
+            defaultChecked={editOtro?.cuentaEnAvance ?? true}
+          />
+          <Field label="Descripción">
+            <textarea
+              name="descripcion"
+              rows={2}
+              defaultValue={editOtro?.descripcion ?? ''}
+            />
+          </Field>
+          <FormActions onCancel={() => setOtroOpen(false)} />
         </form>
       </Modal>
 
@@ -760,13 +1116,13 @@ function MateriaDetail({
               placeholder="Ej. Parcial 1 — Unidad 1 y 2"
             />
           </Field>
-          <Field label={`Semana (1–${SEMANAS_POR_CICLO})`}>
+          <Field label={`Semana (1–${semanasActivas})`}>
             <select
               name="semana"
               required
               defaultValue={editParcial?.semana ?? 1}
             >
-              {Array.from({ length: SEMANAS_POR_CICLO }, (_, i) => {
+              {Array.from({ length: semanasActivas }, (_, i) => {
                 const n = i + 1
                 const taken =
                   blocked.includes(n) && editParcial?.semana !== n

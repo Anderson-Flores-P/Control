@@ -7,14 +7,13 @@ import {
   materiasDelCiclo,
   semanasConFestivo,
 } from '../lib/stats'
-import { SEMANAS_POR_CICLO } from '../types'
 
 interface SemanasViewProps {
   onOpenMateria: (id: string) => void
 }
 
 export function SemanasView({ onOpenMateria }: SemanasViewProps) {
-  const { data, activeCiclo } = useStore()
+  const { data, activeCiclo, semanasActivas } = useStore()
   const mats = materiasDelCiclo(data)
   const current = semanaActualCiclo(activeCiclo.inicio, activeCiclo.fin)
   const festivoWeeks = semanasConFestivo(data)
@@ -23,9 +22,10 @@ export function SemanasView({ onOpenMateria }: SemanasViewProps) {
     <div className="view">
       <header className="view-header">
         <div>
-          <h2>20 Semanas</h2>
+          <h2>{semanasActivas} Semanas</h2>
           <p>
-            {activeCiclo.nombre} · semana actual {current}/20 · vista cruzada por materia
+            {activeCiclo.nombre} · semana actual {current}/{semanasActivas} · calculadas
+            desde {activeCiclo.inicio} → {activeCiclo.fin}
           </p>
         </div>
       </header>
@@ -46,7 +46,7 @@ export function SemanasView({ onOpenMateria }: SemanasViewProps) {
           <thead>
             <tr>
               <th className="sticky-col">Materia</th>
-              {Array.from({ length: SEMANAS_POR_CICLO }, (_, i) => (
+              {Array.from({ length: semanasActivas }, (_, i) => (
                 <th
                   key={i}
                   className={`${i + 1 === current ? 'current-week' : ''}${
@@ -79,7 +79,7 @@ export function SemanasView({ onOpenMateria }: SemanasViewProps) {
                     {m.nombre}
                   </button>
                 </td>
-                {Array.from({ length: SEMANAS_POR_CICLO }, (_, i) => {
+                {Array.from({ length: semanasActivas }, (_, i) => {
                   const semana = i + 1
                   const parcial = semanaTieneParcial(data, m.id, semana)
                   const tCount = data.tareas.filter(
@@ -139,7 +139,7 @@ export function SemanasView({ onOpenMateria }: SemanasViewProps) {
       </div>
 
       {mats.length === 0 && (
-        <p className="empty-hint">Agregá materias para ver el tablero de 20 semanas.</p>
+        <p className="empty-hint">Agregá materias para ver el tablero de semanas.</p>
       )}
 
       <div className="legend-row">

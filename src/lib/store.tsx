@@ -7,19 +7,20 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { createDefaultData, loadData, saveData, uid } from './storage'
+import { createDefaultData, loadData, mergeCicloExport, parseCicloExport, saveData, uid, type CicloExport } from './storage'
 import type {
   ActivityStatus,
   AppData,
   Ciclo,
+  Corto,
   Festividad,
   Foro,
   Materia,
+  Otro,
   Parcial,
   Tarea,
 } from '../types'
-import { SEMANAS_POR_CICLO } from '../types'
-import { clampSemana, getActiveCiclo, materiasDelCiclo, semanasBloqueadas } from './stats'
+import { clampSemana, getActiveCiclo, materiasDelCiclo, semanasBloqueadas, semanasDeCiclo } from './stats'
 
 interface StoreContextValue {
   data: AppData
@@ -41,25 +42,48 @@ interface StoreContextValue {
   updateForo: (id: string, patch: Partial<Foro>) => { ok: true } | { ok: false; reason: string }
   removeForo: (id: string) => void
   toggleForoStatus: (id: string) => void
+  addCorto: (c: Omit<Corto, 'id' | 'createdAt'>) => { ok: true } | { ok: false; reason: string }
+  updateCorto: (id: string, patch: Partial<Corto>) => { ok: true } | { ok: false; reason: string }
+  removeCorto: (id: string) => void
+  toggleCortoStatus: (id: string) => void
+  addOtro: (o: Omit<Otro, 'id' | 'createdAt'>) => { ok: true } | { ok: false; reason: string }
+  updateOtro: (id: string, patch: Partial<Otro>) => { ok: true } | { ok: false; reason: string }
+  removeOtro: (id: string) => void
+  toggleOtroStatus: (id: string) => void
   addParcial: (p: Omit<Parcial, 'id' | 'createdAt'>) => { ok: true } | { ok: false; reason: string }
   updateParcial: (id: string, patch: Partial<Parcial>) => { ok: true } | { ok: false; reason: string }
   removeParcial: (id: string) => void
   addFestividad: (f: Omit<Festividad, 'id'>) => { ok: true } | { ok: false; reason: string }
   updateFestividad: (id: string, patch: Partial<Festividad>) => { ok: true } | { ok: false; reason: string }
   removeFestividad: (id: string) => void
+  importCicloJson: (raw: string) => { ok: true; nombre: string } | { ok: false; reason: string }
   isSemanaBloqueada: (materiaId: string, semana: number) => boolean
   resetData: () => void
   getMateria: (id: string) => Materia | undefined
+  semanasActivas: number
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
 
+function maxSemanasForMateria(data: AppData, materiaId: string): number {
+  const mat = data.materias.find((m) => m.id === materiaId)
+  const ciclo = data.ciclos.find((c) => c.id === mat?.cicloId) ?? getActiveCiclo(data)
+  return semanasDeCiclo(ciclo)
+}
+
 function cycleStatus(current: ActivityStatus): ActivityStatus {
-  if (current === 'completada') return 'pendiente'
+  if (current === 'completada' || current === 'no_hubo') return 'pendiente'
   if (current === 'pendiente' || current === 'desactivada' || current === 'vencida') {
     return 'en_progreso'
   }
   return 'completada'
+}
+
+function blockedFail(semana: number) {
+  return {
+    ok: false as const,
+    reason: `La semana ${semana} está bloqueada por un parcial en esta materia.`,
+  }
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
@@ -71,6 +95,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const activeCiclo = getActiveCiclo(data)
   const materiasActivas = materiasDelCiclo(data)
+  const semanasActivas = semanasDeCiclo(activeCiclo)
 
   const isSemanaBloqueada = useCallback(
     (materiaId: string, semana: number) => semanasBloqueadas(data, materiaId).has(semana),
@@ -143,6 +168,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           materiaId: matMap.get(p.materiaId)!,
           createdAt: new Date().toISOString(),
         }))
+      const cortos = (d.cortos ?? [])
+        .filter((c) => matMap.has(c.materiaId))
+        .map((c) => ({
+          ...c,
+          id: uid(),
+          materiaId: matMap.get(c.materiaId)!,
+          createdAt: new Date().toISOString(),
+        }))
+      const otros = (d.otros ?? [])
+        .filter((o) => matMap.has(o.materiaId))
+        .map((o) => ({
+          ...o,
+          id: uid(),
+          materiaId: matMap.get(o.materiaId)!,
+          createdAt: new Date().toISOString(),
+        }))
       const festividades = (d.festividades ?? [])
         .filter((f) => f.cicloId === id)
         .map((f) => ({
@@ -162,6 +203,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         materias: [...d.materias, ...materias],
         tareas: [...d.tareas, ...tareas],
         foros: [...d.foros, ...foros],
+        cortos: [...(d.cortos ?? []), ...cortos],
+        otros: [...(d.otros ?? []), ...otros],
         parciales: [...d.parciales, ...parciales],
         festividades: [...(d.festividades ?? []), ...festividades],
       }
@@ -194,13 +237,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       materias: d.materias.filter((m) => m.id !== id),
       tareas: d.tareas.filter((t) => t.materiaId !== id),
       foros: d.foros.filter((f) => f.materiaId !== id),
+      cortos: (d.cortos ?? []).filter((c) => c.materiaId !== id),
+      otros: (d.otros ?? []).filter((o) => o.materiaId !== id),
       parciales: d.parciales.filter((p) => p.materiaId !== id),
     }))
   }, [])
 
   const addTarea = useCallback(
     (t: Omit<Tarea, 'id' | 'createdAt'>) => {
-      const semana = clampSemana(t.semana)
+      const semana = clampSemana(t.semana, maxSemanasForMateria(data, t.materiaId))
       if (semanasBloqueadas(data, t.materiaId).has(semana)) {
         return {
           ok: false as const,
@@ -211,7 +256,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ...d,
         tareas: [
           ...d.tareas,
-          { ...t, semana, id: uid(), createdAt: new Date().toISOString() },
+          {
+            ...t,
+            semana,
+            nota: t.nota ?? null,
+            notaMaxima: t.notaMaxima ?? 10,
+            id: uid(),
+            createdAt: new Date().toISOString(),
+          },
         ],
       }))
       return { ok: true as const }
@@ -223,8 +275,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (id: string, patch: Partial<Tarea>) => {
       const current = data.tareas.find((t) => t.id === id)
       if (!current) return { ok: false as const, reason: 'Tarea no encontrada.' }
-      const semana = clampSemana(patch.semana ?? current.semana)
       const materiaId = patch.materiaId ?? current.materiaId
+      const semana = clampSemana(
+        patch.semana ?? current.semana,
+        maxSemanasForMateria(data, materiaId),
+      )
       if (semanasBloqueadas(data, materiaId).has(semana)) {
         return {
           ok: false as const,
@@ -259,7 +314,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const addForo = useCallback(
     (f: Omit<Foro, 'id' | 'createdAt'>) => {
-      const semana = clampSemana(f.semana)
+      const semana = clampSemana(f.semana, maxSemanasForMateria(data, f.materiaId))
       if (semanasBloqueadas(data, f.materiaId).has(semana)) {
         return {
           ok: false as const,
@@ -270,7 +325,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ...d,
         foros: [
           ...d.foros,
-          { ...f, semana, id: uid(), createdAt: new Date().toISOString() },
+          {
+            ...f,
+            semana,
+            nota: f.nota ?? null,
+            notaMaxima: f.notaMaxima ?? 10,
+            id: uid(),
+            createdAt: new Date().toISOString(),
+          },
         ],
       }))
       return { ok: true as const }
@@ -282,8 +344,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (id: string, patch: Partial<Foro>) => {
       const current = data.foros.find((f) => f.id === id)
       if (!current) return { ok: false as const, reason: 'Foro no encontrado.' }
-      const semana = clampSemana(patch.semana ?? current.semana)
       const materiaId = patch.materiaId ?? current.materiaId
+      const semana = clampSemana(
+        patch.semana ?? current.semana,
+        maxSemanasForMateria(data, materiaId),
+      )
       if (semanasBloqueadas(data, materiaId).has(semana)) {
         return {
           ok: false as const,
@@ -316,13 +381,136 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const addCorto = useCallback(
+    (c: Omit<Corto, 'id' | 'createdAt'>) => {
+      const semana = clampSemana(c.semana, maxSemanasForMateria(data, c.materiaId))
+      if (semanasBloqueadas(data, c.materiaId).has(semana)) return blockedFail(semana)
+      setData((d) => ({
+        ...d,
+        cortos: [
+          ...(d.cortos ?? []),
+          {
+            ...c,
+            semana,
+            nota: c.nota ?? null,
+            notaMaxima: c.notaMaxima ?? 10,
+            id: uid(),
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }))
+      return { ok: true as const }
+    },
+    [data],
+  )
+
+  const updateCorto = useCallback(
+    (id: string, patch: Partial<Corto>) => {
+      const current = (data.cortos ?? []).find((c) => c.id === id)
+      if (!current) return { ok: false as const, reason: 'Corto no encontrado.' }
+      const materiaId = patch.materiaId ?? current.materiaId
+      const semana = clampSemana(
+        patch.semana ?? current.semana,
+        maxSemanasForMateria(data, materiaId),
+      )
+      if (semanasBloqueadas(data, materiaId).has(semana)) return blockedFail(semana)
+      setData((d) => ({
+        ...d,
+        cortos: (d.cortos ?? []).map((c) =>
+          c.id === id ? { ...c, ...patch, semana } : c,
+        ),
+      }))
+      return { ok: true as const }
+    },
+    [data],
+  )
+
+  const removeCorto = useCallback((id: string) => {
+    setData((d) => ({
+      ...d,
+      cortos: (d.cortos ?? []).filter((c) => c.id !== id),
+    }))
+  }, [])
+
+  const toggleCortoStatus = useCallback((id: string) => {
+    setData((d) => ({
+      ...d,
+      cortos: (d.cortos ?? []).map((c) => {
+        if (c.id !== id) return c
+        if (semanasBloqueadas(d, c.materiaId).has(c.semana)) return c
+        return { ...c, status: cycleStatus(c.status) }
+      }),
+    }))
+  }, [])
+
+  const addOtro = useCallback(
+    (o: Omit<Otro, 'id' | 'createdAt'>) => {
+      const semana = clampSemana(o.semana, maxSemanasForMateria(data, o.materiaId))
+      // Otros no se bloquean por parcial (actividad externa)
+      setData((d) => ({
+        ...d,
+        otros: [
+          ...(d.otros ?? []),
+          {
+            ...o,
+            semana,
+            origen: o.origen ?? '',
+            nota: o.nota ?? null,
+            notaMaxima: o.notaMaxima ?? 10,
+            id: uid(),
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }))
+      return { ok: true as const }
+    },
+    [data],
+  )
+
+  const updateOtro = useCallback(
+    (id: string, patch: Partial<Otro>) => {
+      const current = (data.otros ?? []).find((o) => o.id === id)
+      if (!current) return { ok: false as const, reason: 'Actividad no encontrada.' }
+      const materiaId = patch.materiaId ?? current.materiaId
+      const semana = clampSemana(
+        patch.semana ?? current.semana,
+        maxSemanasForMateria(data, materiaId),
+      )
+      setData((d) => ({
+        ...d,
+        otros: (d.otros ?? []).map((o) =>
+          o.id === id ? { ...o, ...patch, semana } : o,
+        ),
+      }))
+      return { ok: true as const }
+    },
+    [data],
+  )
+
+  const removeOtro = useCallback((id: string) => {
+    setData((d) => ({
+      ...d,
+      otros: (d.otros ?? []).filter((o) => o.id !== id),
+    }))
+  }, [])
+
+  const toggleOtroStatus = useCallback((id: string) => {
+    setData((d) => ({
+      ...d,
+      otros: (d.otros ?? []).map((o) =>
+        o.id === id ? { ...o, status: cycleStatus(o.status) } : o,
+      ),
+    }))
+  }, [])
+
   const addParcial = useCallback(
     (p: Omit<Parcial, 'id' | 'createdAt'>) => {
-      const semana = clampSemana(p.semana)
-      if (semana < 1 || semana > SEMANAS_POR_CICLO) {
+      const max = maxSemanasForMateria(data, p.materiaId)
+      const semana = clampSemana(p.semana, max)
+      if (semana < 1 || semana > max) {
         return {
           ok: false as const,
-          reason: `La semana debe estar entre 1 y ${SEMANAS_POR_CICLO}.`,
+          reason: `La semana debe estar entre 1 y ${max}.`,
         }
       }
       if (
@@ -351,8 +539,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (id: string, patch: Partial<Parcial>) => {
       const current = data.parciales.find((p) => p.id === id)
       if (!current) return { ok: false as const, reason: 'Parcial no encontrado.' }
-      const semana = clampSemana(patch.semana ?? current.semana)
       const materiaId = patch.materiaId ?? current.materiaId
+      const max = maxSemanasForMateria(data, materiaId)
+      const semana = clampSemana(patch.semana ?? current.semana, max)
       if (
         data.parciales.some(
           (x) => x.id !== id && x.materiaId === materiaId && x.semana === semana,
@@ -423,6 +612,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const importCicloJson = useCallback((raw: string) => {
+    const parsed = parseCicloExport(raw)
+    if (!parsed.ok) return parsed
+    const imported: CicloExport = parsed.data
+    setData((d) => mergeCicloExport(d, imported))
+    return { ok: true as const, nombre: imported.ciclo.nombre }
+  }, [])
+
   const resetData = useCallback(() => {
     localStorage.removeItem('uni-control-v2')
     setData(createDefaultData())
@@ -438,6 +635,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       data,
       activeCiclo,
       materiasActivas,
+      semanasActivas,
       setActiveCiclo,
       updateCiclo,
       addCiclo,
@@ -454,12 +652,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateForo,
       removeForo,
       toggleForoStatus,
+      addCorto,
+      updateCorto,
+      removeCorto,
+      toggleCortoStatus,
+      addOtro,
+      updateOtro,
+      removeOtro,
+      toggleOtroStatus,
       addParcial,
       updateParcial,
       removeParcial,
       addFestividad,
       updateFestividad,
       removeFestividad,
+      importCicloJson,
       isSemanaBloqueada,
       resetData,
       getMateria,
@@ -468,6 +675,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       data,
       activeCiclo,
       materiasActivas,
+      semanasActivas,
       setActiveCiclo,
       updateCiclo,
       addCiclo,
@@ -484,12 +692,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateForo,
       removeForo,
       toggleForoStatus,
+      addCorto,
+      updateCorto,
+      removeCorto,
+      toggleCortoStatus,
+      addOtro,
+      updateOtro,
+      removeOtro,
+      toggleOtroStatus,
       addParcial,
       updateParcial,
       removeParcial,
       addFestividad,
       updateFestividad,
       removeFestividad,
+      importCicloJson,
       isSemanaBloqueada,
       resetData,
       getMateria,

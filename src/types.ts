@@ -6,9 +6,17 @@ export type ViewId =
   | 'ciclos'
   | 'config'
 
-export type ActivityStatus = 'pendiente' | 'en_progreso' | 'completada' | 'vencida' | 'desactivada'
+export type ActivityStatus =
+  | 'pendiente'
+  | 'en_progreso'
+  | 'completada'
+  | 'vencida'
+  | 'desactivada'
+  | 'no_hubo'
 
-export const SEMANAS_POR_CICLO = 20
+export const SEMANAS_POR_DEFECTO = 20
+/** @deprecated usar calcularSemanasCiclo(inicio, fin) */
+export const SEMANAS_POR_CICLO = SEMANAS_POR_DEFECTO
 
 export interface Ciclo {
   id: string
@@ -55,33 +63,40 @@ export const DIAS_SEMANA: { value: DiaSemana; label: string; corto: string }[] =
   { value: 7, label: 'Domingo', corto: 'Dom' },
 ]
 
-/** Por defecto Lun–Vie si la materia no tiene horario cargado */
-export const DIAS_CLASE_DEFAULT: DiaSemana[] = [1, 2, 3, 4, 5]
+/** Por defecto vacío: el usuario marca los días al crear/editar */
+export const DIAS_CLASE_DEFAULT: DiaSemana[] = []
 
-export interface Tarea {
+/** Actividad semanal con calificación opcional */
+export interface ActividadSemanal {
   id: string
   materiaId: string
   semana: number
   titulo: string
   descripcion: string
   status: ActivityStatus
+  nota: number | null
+  notaMaxima: number
+  /**
+   * Si cuenta para el avance académico.
+   * Cortos: por defecto false; aun así cuentan si no hay tarea en esa semana.
+   */
+  cuentaEnAvance: boolean
   createdAt: string
 }
 
-export interface Foro {
-  id: string
-  materiaId: string
-  semana: number
-  titulo: string
-  descripcion: string
-  status: ActivityStatus
-  createdAt: string
+export type Tarea = ActividadSemanal
+export type Foro = ActividadSemanal
+/** Llamado corto — opcional por semana */
+export type Corto = ActividadSemanal
+/** Actividad extra (otra universidad u otro curso) */
+export interface Otro extends ActividadSemanal {
+  origen: string
 }
 
 export interface Parcial {
   id: string
   materiaId: string
-  /** Semana del ciclo (1–20) en la que corre el parcial */
+  /** Semana del ciclo en la que corre el parcial */
   semana: number
   titulo: string
   nota: number | null
@@ -96,6 +111,8 @@ export interface AppData {
   materias: Materia[]
   tareas: Tarea[]
   foros: Foro[]
+  cortos: Corto[]
+  otros: Otro[]
   parciales: Parcial[]
   festividades: Festividad[]
 }
@@ -109,4 +126,14 @@ export const MATERIA_COLORS = [
   '#a855f7',
   '#ec4899',
   '#84cc16',
+]
+
+export const ACTIVITY_STATUS_OPTIONS: {
+  value: Exclude<ActivityStatus, 'desactivada' | 'vencida'>
+  label: string
+}[] = [
+  { value: 'pendiente', label: 'Pendiente' },
+  { value: 'en_progreso', label: 'En progreso' },
+  { value: 'completada', label: 'Completada' },
+  { value: 'no_hubo', label: 'No hubo esta actividad' },
 ]

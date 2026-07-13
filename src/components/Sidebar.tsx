@@ -12,7 +12,7 @@ import type { ViewId } from '../types'
 const NAV: { id: ViewId; label: string; icon: LucideIcon }[] = [
   { id: 'panel', label: 'Panel', icon: LayoutDashboard },
   { id: 'materias', label: 'Materias', icon: BookOpen },
-  { id: 'semanas', label: '20 Semanas', icon: CalendarRange },
+  { id: 'semanas', label: 'Semanas', icon: CalendarRange },
   { id: 'festivos', label: 'Festivos', icon: CalendarOff },
   { id: 'ciclos', label: 'Ciclos', icon: Layers },
   { id: 'config', label: 'Configuración', icon: Settings },
@@ -60,7 +60,7 @@ export function Sidebar({
 
       <div className="sidebar-foot">
         <span className="foot-label">Estructura</span>
-        <span className="foot-value">20 semanas · por materia</span>
+        <span className="foot-value">Semanas según fechas del ciclo</span>
       </div>
     </aside>
   )

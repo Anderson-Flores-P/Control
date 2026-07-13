@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { StoreProvider, useStore } from './lib/store'
 import { Sidebar } from './components/Sidebar'
+import { LiveClock } from './components/LiveClock'
 import { PanelView } from './views/PanelView'
 import { MateriasView } from './views/MateriasView'
 import { SemanasView } from './views/SemanasView'
@@ -44,6 +45,7 @@ function Shell() {
         {view === 'ciclos' && <CiclosView />}
         {view === 'config' && <ConfigView />}
       </main>
+      <LiveClock />
     </div>
   )
 }
