@@ -21,6 +21,8 @@ import type {
   Tarea,
 } from '../types'
 import { clampSemana, getActiveCiclo, materiasDelCiclo, semanasBloqueadas, semanasDeCiclo } from './stats'
+import { canAutoVencer, isPastDue } from './taskDue'
+import { clearNotificationMarksForTask } from './notifications'
 
 interface StoreContextValue {
   data: AppData
@@ -39,6 +41,8 @@ interface StoreContextValue {
   updateTarea: (id: string, patch: Partial<Tarea>) => { ok: true } | { ok: false; reason: string }
   removeTarea: (id: string) => void
   toggleTareaStatus: (id: string) => void
+  /** Marca pendientes/en progreso vencidas según fecha+hora */
+  syncTareasVencidas: () => void
   addForo: (f: Omit<Foro, 'id' | 'createdAt'>) => { ok: true } | { ok: false; reason: string }
   updateForo: (id: string, patch: Partial<Foro>) => { ok: true } | { ok: false; reason: string }
   removeForo: (id: string) => void
@@ -308,6 +312,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             semana,
             nota: t.nota ?? null,
             notaMaxima: t.notaMaxima ?? 10,
+            fechaVencimiento: t.fechaVencimiento ?? null,
+            horaVencimiento: t.horaVencimiento ?? null,
+            notificar: t.notificar ?? Boolean(t.fechaVencimiento),
             id: uid(),
             createdAt: new Date().toISOString(),
           },
@@ -333,6 +340,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           reason: `La semana ${semana} está bloqueada por un parcial.`,
         }
       }
+      if (
+        patch.fechaVencimiento !== undefined ||
+        patch.horaVencimiento !== undefined
+      ) {
+        clearNotificationMarksForTask(id)
+      }
       setData((d) => ({
         ...d,
         tareas: d.tareas.map((t) =>
@@ -345,6 +358,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   )
 
   const removeTarea = useCallback((id: string) => {
+    clearNotificationMarksForTask(id)
     setData((d) => ({ ...d, tareas: d.tareas.filter((t) => t.id !== id) }))
   }, [])
 
@@ -357,6 +371,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return { ...t, status: cycleStatus(t.status) }
       }),
     }))
+  }, [])
+
+  const syncTareasVencidas = useCallback(() => {
+    setData((d) => {
+      let changed = false
+      const tareas = d.tareas.map((t) => {
+        if (!canAutoVencer(t.status)) return t
+        if (!isPastDue(t)) return t
+        changed = true
+        return { ...t, status: 'vencida' as const }
+      })
+      return changed ? { ...d, tareas } : d
+    })
   }, [])
 
   const addForo = useCallback(
@@ -696,6 +723,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateTarea,
       removeTarea,
       toggleTareaStatus,
+      syncTareasVencidas,
       addForo,
       updateForo,
       removeForo,
@@ -737,6 +765,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateTarea,
       removeTarea,
       toggleTareaStatus,
+      syncTareasVencidas,
       addForo,
       updateForo,
       removeForo,

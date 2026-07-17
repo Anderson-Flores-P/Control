@@ -694,6 +694,8 @@ export interface PendingItem {
   materiaNombre: string
   materiaColor: string
   origen?: string
+  fechaVencimiento?: string | null
+  horaVencimiento?: string | null
 }
 
 export const PENDING_TIPO_LABEL: Record<PendingTipo, string> = {
@@ -733,6 +735,8 @@ export function pendientesCiclo(
       titulo: string
       status: ActivityStatus
       origen?: string
+      fechaVencimiento?: string | null
+      horaVencimiento?: string | null
     }[],
   ) => {
     for (const a of list) {
@@ -750,6 +754,8 @@ export function pendientesCiclo(
         materiaNombre: m.nombre,
         materiaColor: m.color,
         origen: a.origen,
+        fechaVencimiento: a.fechaVencimiento ?? null,
+        horaVencimiento: a.horaVencimiento ?? null,
       })
     }
   }
@@ -776,6 +782,15 @@ export function pendientesCiclo(
   }
 
   items.sort((a, b) => {
+    const da = a.fechaVencimiento
+      ? `${a.fechaVencimiento}T${a.horaVencimiento ?? '23:59'}`
+      : ''
+    const db = b.fechaVencimiento
+      ? `${b.fechaVencimiento}T${b.horaVencimiento ?? '23:59'}`
+      : ''
+    if (da && db && da !== db) return da.localeCompare(db)
+    if (da && !db) return -1
+    if (!da && db) return 1
     if (a.semana !== b.semana) return a.semana - b.semana
     const mat = a.materiaNombre.localeCompare(b.materiaNombre, 'es')
     if (mat !== 0) return mat

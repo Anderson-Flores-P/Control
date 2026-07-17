@@ -84,7 +84,16 @@ export interface ActividadSemanal {
   createdAt: string
 }
 
-export type Tarea = ActividadSemanal
+/** Tarea con fecha/hora de vencimiento y aviso opcional */
+export interface Tarea extends ActividadSemanal {
+  /** Día de vencimiento (yyyy-MM-dd); null = sin fecha */
+  fechaVencimiento: string | null
+  /** Hora de vencimiento (HH:mm); null = fin del día (23:59) */
+  horaVencimiento: string | null
+  /** Pedir notificación del navegador al acercarse / vencer */
+  notificar: boolean
+}
+
 export type Foro = ActividadSemanal
 /** Llamado corto — opcional por semana */
 export type Corto = ActividadSemanal

@@ -1991,6 +1991,16 @@ p {
   letter-spacing: 0;
 }
 
+.due-cell {
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.due-label {
+  color: var(--text);
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;

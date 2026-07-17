@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { StoreProvider, useStore } from './lib/store'
+import { useTaskReminders } from './lib/useTaskReminders'
 import { Sidebar } from './components/Sidebar'
 import { LiveClock } from './components/LiveClock'
 import { PanelView } from './views/PanelView'
@@ -14,6 +15,7 @@ function Shell() {
   const [view, setView] = useState<ViewId>('panel')
   const [materiaId, setMateriaId] = useState<string | null>(null)
   const { activeCiclo } = useStore()
+  useTaskReminders()
 
   const openMateria = (id: string) => {
     setMateriaId(id)

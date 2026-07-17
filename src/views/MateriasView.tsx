@@ -34,6 +34,8 @@ import {
   parseGradeFromForm,
 } from '../components/ActivityFields'
 import { DiasClasePicker } from '../components/DiasClasePicker'
+import { parseDueFromForm, formatDueLabel } from '../lib/taskDue'
+import { requestNotificationPermission } from '../lib/notifications'
 import {
   DIAS_CLASE_DEFAULT,
   MATERIA_COLORS,
@@ -304,6 +306,7 @@ function MateriaDetail({
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     const { nota, notaMaxima } = parseGradeFromForm(fd)
+    const due = parseDueFromForm(fd)
     const payload = {
       materiaId: materia.id,
       titulo: String(fd.get('titulo')).trim(),
@@ -313,8 +316,12 @@ function MateriaDetail({
       nota,
       notaMaxima,
       cuentaEnAvance: parseCuentaEnAvance(fd),
+      ...due,
     }
     if (!payload.titulo) return
+    if (payload.notificar && payload.fechaVencimiento) {
+      void requestNotificationPermission()
+    }
     const res = editTarea
       ? updateTarea(editTarea.id, payload)
       : addTarea(payload)
@@ -545,6 +552,7 @@ function MateriaDetail({
                   <tr>
                     <th>Tarea</th>
                     <th>Semana</th>
+                    <th>Vence</th>
                     <th>Nota</th>
                     <th>Estado</th>
                     <th />
@@ -553,10 +561,19 @@ function MateriaDetail({
                 <tbody>
                   {tareas
                     .slice()
-                    .sort((a, b) => a.semana - b.semana)
+                    .sort((a, b) => {
+                      if (a.semana !== b.semana) return a.semana - b.semana
+                      const da = a.fechaVencimiento ?? ''
+                      const db = b.fechaVencimiento ?? ''
+                      if (da !== db) return da.localeCompare(db)
+                      return (a.horaVencimiento ?? '').localeCompare(
+                        b.horaVencimiento ?? '',
+                      )
+                    })
                     .map((t) => {
                       const bloqueada = blocked.includes(t.semana)
                       const st = statusEfectivo(t.status, bloqueada)
+                      const dueLabel = formatDueLabel(t)
                       return (
                         <tr key={t.id} className={bloqueada ? 'row-blocked' : ''}>
                           <td>
@@ -581,6 +598,21 @@ function MateriaDetail({
                               <span className="lock-inline">
                                 <Lock size={12} />
                               </span>
+                            )}
+                          </td>
+                          <td className="due-cell">
+                            {dueLabel ? (
+                              <span className="due-label">
+                                {dueLabel}
+                                {t.notificar && (
+                                  <span className="chip-muted" title="Notificación activa">
+                                    {' '}
+                                    · aviso
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="chip-muted">—</span>
                             )}
                           </td>
                           <td className="mono">
@@ -969,6 +1001,40 @@ function MateriaDetail({
             disabledWeeks={blocked}
             totalSemanas={semanasActivas}
           />
+          <div className="field-row">
+            <Field label="Día de vencimiento">
+              <input
+                name="fechaVencimiento"
+                type="date"
+                defaultValue={editTarea?.fechaVencimiento ?? ''}
+                key={(editTarea?.id ?? 'new') + '-fecha'}
+              />
+            </Field>
+            <Field label="Hora">
+              <input
+                name="horaVencimiento"
+                type="time"
+                defaultValue={editTarea?.horaVencimiento ?? ''}
+                key={(editTarea?.id ?? 'new') + '-hora'}
+              />
+            </Field>
+          </div>
+          <label className="field-check">
+            <input
+              type="checkbox"
+              name="notificar"
+              value="1"
+              defaultChecked={editTarea?.notificar ?? true}
+              key={(editTarea?.id ?? 'new') + '-notif'}
+            />
+            <span>
+              <strong>Avisar con notificación</strong>
+              <small>
+                Alerta 24 h antes, 1 h antes y al vencer (app abierta en el
+                navegador)
+              </small>
+            </span>
+          </label>
           <ActivityStatusSelect defaultValue={editTarea?.status ?? 'pendiente'} />
           <GradeFields nota={editTarea?.nota} notaMaxima={editTarea?.notaMaxima ?? 10} />
           <CuentaEnAvanceField

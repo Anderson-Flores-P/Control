@@ -102,6 +102,9 @@ export function createDefaultData(): AppData {
       descripcion: 'Casos de uso y secuencia',
       status: 'pendiente',
       createdAt: now,
+      fechaVencimiento: dateOffset(`${year}-01-20`, 10),
+      horaVencimiento: '23:59',
+      notificar: true,
     }),
     withGrade({
       id: uid(),
@@ -111,6 +114,9 @@ export function createDefaultData(): AppData {
       descripcion: 'Historias de usuario',
       status: 'en_progreso',
       createdAt: now,
+      fechaVencimiento: dateOffset(`${year}-01-20`, 24),
+      horaVencimiento: '18:00',
+      notificar: true,
     }),
     withGrade({
       id: uid(),
@@ -121,6 +127,9 @@ export function createDefaultData(): AppData {
       status: 'completada',
       nota: 9,
       createdAt: now,
+      fechaVencimiento: null,
+      horaVencimiento: null,
+      notificar: false,
     }),
   ]
 
@@ -226,6 +235,15 @@ function normalizeActividad<T extends ActividadSemanal>(
   return (list ?? []).map((item) => withGrade(item, defaultCuentaEnAvance) as T)
 }
 
+function normalizeTareas(list: Tarea[] | undefined): Tarea[] {
+  return (list ?? []).map((item) => ({
+    ...withGrade(item, true),
+    fechaVencimiento: item.fechaVencimiento ?? null,
+    horaVencimiento: item.horaVencimiento ?? null,
+    notificar: item.notificar ?? Boolean(item.fechaVencimiento),
+  }))
+}
+
 function normalize(data: AppData): AppData {
   return {
     ...data,
@@ -235,7 +253,7 @@ function normalize(data: AppData): AppData {
       ...withGrade(o, true),
       origen: o.origen ?? '',
     })),
-    tareas: normalizeActividad(data.tareas, true),
+    tareas: normalizeTareas(data.tareas),
     foros: normalizeActividad(data.foros, true),
     materias: (data.materias ?? []).map((m) => ({
       ...m,
@@ -311,7 +329,7 @@ export function parseCicloExport(
           ...m,
           diasClase: Array.isArray(m.diasClase) ? m.diasClase : [],
         })),
-        tareas: normalizeActividad(parsed.tareas as Tarea[], true),
+        tareas: normalizeTareas(parsed.tareas as Tarea[]),
         foros: normalizeActividad(parsed.foros as Foro[], true),
         cortos: normalizeActividad(parsed.cortos as Corto[], false),
         otros: (parsed.otros ?? []).map((o) => ({

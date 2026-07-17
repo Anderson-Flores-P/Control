@@ -5,6 +5,7 @@ import {
   type PendingItem,
   type PendingTipo,
 } from '../lib/stats'
+import { formatDueLabel, isPastDue } from '../lib/taskDue'
 import type { ActivityStatus } from '../types'
 
 interface Props {
@@ -34,7 +35,15 @@ export function PendingTasksPanel({
   onOpenMateria,
 }: Props) {
   const estaSemana = items.filter((i) => i.semana === semanaActual).length
-  const vencidas = items.filter((i) => i.status === 'vencida').length
+  const vencidas = items.filter(
+    (i) =>
+      i.status === 'vencida' ||
+      (i.fechaVencimiento != null &&
+        isPastDue({
+          fechaVencimiento: i.fechaVencimiento,
+          horaVencimiento: i.horaVencimiento ?? null,
+        })),
+  ).length
 
   return (
     <section className="upcoming-panel pending-panel">
@@ -58,7 +67,9 @@ export function PendingTasksPanel({
               </span>
             )}
             {vencidas > 0 && (
-              <span className="pending-meta warn">{vencidas} vencida{vencidas === 1 ? '' : 's'}</span>
+              <span className="pending-meta warn">
+                {vencidas} vencida{vencidas === 1 ? '' : 's'}
+              </span>
             )}
           </div>
         )}
@@ -70,7 +81,22 @@ export function PendingTasksPanel({
         <ul className="upcoming-list pending-list">
           {items.map((item) => {
             const isCurrent = item.semana === semanaActual
-            const isOverdue = item.status === 'vencida' || item.semana < semanaActual
+            const dueOverdue =
+              item.fechaVencimiento != null &&
+              isPastDue({
+                fechaVencimiento: item.fechaVencimiento,
+                horaVencimiento: item.horaVencimiento ?? null,
+              })
+            const isOverdue =
+              item.status === 'vencida' ||
+              dueOverdue ||
+              (item.tipo !== 'parcial' &&
+                !item.fechaVencimiento &&
+                item.semana < semanaActual)
+            const dueLabel = formatDueLabel({
+              fechaVencimiento: item.fechaVencimiento ?? null,
+              horaVencimiento: item.horaVencimiento ?? null,
+            })
             return (
               <li key={`${item.tipo}-${item.id}`}>
                 <button
@@ -87,6 +113,7 @@ export function PendingTasksPanel({
                     <span>
                       {item.materiaNombre}
                       {item.origen ? ` · ${item.origen}` : ''}
+                      {dueLabel ? ` · Vence ${dueLabel}` : ''}
                     </span>
                   </div>
                   <div className="pending-meta-row">

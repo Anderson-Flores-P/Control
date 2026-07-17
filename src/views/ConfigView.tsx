@@ -1,12 +1,21 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useStore } from '../lib/store'
 import { Field } from '../components/Modal'
 import { semanasDeCiclo } from '../lib/stats'
+import {
+  notificationPermission,
+  requestNotificationPermission,
+} from '../lib/notifications'
 
 export function ConfigView() {
   const { activeCiclo, updateCiclo, resetData, setActiveCiclo, data } = useStore()
   const [saved, setSaved] = useState(false)
+  const [notifPerm, setNotifPerm] = useState(notificationPermission())
   const weeks = semanasDeCiclo(activeCiclo)
+
+  useEffect(() => {
+    setNotifPerm(notificationPermission())
+  }, [])
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -18,6 +27,11 @@ export function ConfigView() {
     })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  const enableNotifs = async () => {
+    const result = await requestNotificationPermission()
+    setNotifPerm(result)
   }
 
   return (
@@ -76,6 +90,29 @@ export function ConfigView() {
             </button>
           </div>
         </form>
+      </section>
+
+      <section className="config-card">
+        <h3>Notificaciones de tareas</h3>
+        <p>
+          Avisos del navegador 24 h antes, 1 h antes y al vencer. La app debe
+          estar abierta en una pestaña.
+        </p>
+        <p className="hint-inline" style={{ marginBottom: '0.75rem' }}>
+          Estado:{' '}
+          {notifPerm === 'granted'
+            ? 'Permitidas'
+            : notifPerm === 'denied'
+              ? 'Bloqueadas (revisá el candado del sitio en el navegador)'
+              : notifPerm === 'unsupported'
+                ? 'No soportadas en este navegador'
+                : 'Sin pedir aún'}
+        </p>
+        {notifPerm !== 'granted' && notifPerm !== 'unsupported' && (
+          <button type="button" className="btn primary" onClick={() => void enableNotifs()}>
+            Activar notificaciones
+          </button>
+        )}
       </section>
 
       <section className="config-card danger-zone">
