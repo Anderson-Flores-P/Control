@@ -1,0 +1,186 @@
+DOCUMENTACIÓN DEL PROYECTO CONTROL UNI
+=======================================
+
+1. ¿QUÉ ES EL PROYECTO?
+
+Control Uni es una aplicación web de uso personal para organizar y consultar
+información académica. Permite administrar ciclos universitarios, materias,
+actividades, calificaciones, fechas de entrega, días festivos y el progreso
+del estudiante.
+
+Cada ciclo se organiza por semanas. Dentro de cada materia se pueden registrar
+tareas, foros, cortos, parciales y otras actividades. La aplicación también
+permite archivar ciclos, exportarlos como archivos JSON e importar respaldos.
+
+La aplicación funciona completamente en el navegador. No usa servidor,
+backend ni base de datos externa. La información se guarda en localStorage,
+con la clave "uni-control-v2", por lo que los datos permanecen en el navegador
+y dispositivo donde se utiliza.
+
+
+2. FUNCIONES PRINCIPALES
+
+- Panel: muestra el avance académico y temporal del ciclo activo.
+- Materias: administra materias y sus actividades semanales.
+- 20 Semanas: presenta una matriz de materias y semanas.
+- Festivos: registra feriados y días sin clases.
+- Ciclos: crea, activa, archiva, exporta e importa ciclos.
+- Configuración: modifica fechas y datos del ciclo activo.
+- Notificaciones: avisa sobre tareas próximas a vencer mediante el navegador.
+- Respaldos: exporta e importa la información de un ciclo en formato JSON.
+
+
+3. ESTRUCTURA DEL PROYECTO
+
+Raíz del proyecto
+-----------------
+
+- index.html
+  Documento HTML inicial donde se carga la aplicación.
+
+- package.json
+  Define el proyecto, sus dependencias y los comandos de desarrollo.
+
+- package-lock.json
+  Guarda las versiones exactas de las dependencias instaladas con npm.
+
+- vite.config.ts
+  Configuración de Vite y del complemento de React.
+
+- tsconfig.json y tsconfig.*.json
+  Configuración del compilador de TypeScript.
+
+- .oxlintrc.json
+  Reglas usadas por Oxlint para revisar el código.
+
+- README.md
+  Resumen del proyecto e instrucciones básicas de uso.
+
+
+Carpeta src
+-----------
+
+Contiene el código fuente principal de la aplicación.
+
+- src/main.tsx
+  Punto de entrada. Inicia React y monta la aplicación en el documento HTML.
+
+- src/App.tsx
+  Componente principal. Controla la navegación entre las diferentes vistas.
+
+- src/types.ts
+  Define los tipos y modelos de datos: ciclos, materias, tareas, foros,
+  cortos, parciales, festivos y otras actividades.
+
+- src/index.css
+  Contiene los estilos globales y el diseño visual de la aplicación.
+
+- src/views/
+  Contiene las pantallas principales:
+  panel, materias, semanas, festivos, ciclos y configuración.
+
+- src/components/
+  Contiene componentes reutilizables, como navegación, formularios,
+  cuadrículas, gráficas, tarjetas y paneles.
+
+- src/lib/store.tsx
+  Administra el estado global y las operaciones para crear, leer,
+  actualizar y eliminar información.
+
+- src/lib/storage.ts
+  Guarda y carga datos desde localStorage. También gestiona la importación
+  y exportación de respaldos JSON.
+
+- src/lib/stats.ts
+  Calcula progreso, semanas, días lectivos y efecto de los festivos.
+
+- src/lib/notifications.ts y src/lib/useTaskReminders.ts
+  Gestionan permisos y recordatorios de tareas mediante notificaciones
+  del navegador.
+
+
+Carpeta public
+--------------
+
+Contiene archivos estáticos públicos, como favicon e iconos SVG.
+
+
+Carpeta documentacion
+---------------------
+
+Contiene documentación explicativa del proyecto. Este archivo forma parte
+de esa carpeta.
+
+
+4. LENGUAJES UTILIZADOS
+
+- TypeScript:
+  Lenguaje principal del proyecto. Se usa para la lógica, modelos de datos,
+  almacenamiento, cálculos y componentes.
+
+- TSX:
+  Extensión de TypeScript que permite escribir la interfaz de React junto
+  con el código TypeScript.
+
+- HTML5:
+  Se usa en index.html como estructura base que recibe la aplicación.
+
+- CSS:
+  Se usa para colores, distribución, tamaños, adaptación visual y demás
+  estilos de la interfaz.
+
+- JSON:
+  Se usa en archivos de configuración, gestión de dependencias y respaldos
+  exportados por la aplicación.
+
+
+5. TECNOLOGÍAS Y BIBLIOTECAS
+
+- React 19: construcción de la interfaz mediante componentes.
+- React DOM: renderizado de React dentro del navegador.
+- Vite 8: servidor de desarrollo y compilación para producción.
+- date-fns: operaciones y cálculos con fechas.
+- Recharts: gráficas de progreso.
+- Lucide React: iconos de la interfaz.
+- Oxlint: análisis estático y revisión del código.
+- npm: instalación y administración de dependencias.
+- localStorage: persistencia local de los datos del usuario.
+
+
+6. CÓMO EJECUTAR EL PROYECTO
+
+Requisitos:
+
+- Node.js instalado.
+- npm disponible.
+
+Desde una terminal abierta en la raíz del proyecto:
+
+1. Instalar dependencias:
+   npm install
+
+2. Iniciar el servidor de desarrollo:
+   npm run dev
+
+3. Abrir en el navegador la dirección local mostrada por Vite.
+
+
+7. OTROS COMANDOS
+
+- npm run build
+  Comprueba TypeScript y genera la versión lista para producción.
+
+- npm run lint
+  Revisa el código con Oxlint.
+
+- npm run preview
+  Ejecuta una vista previa local de la compilación de producción.
+
+
+8. CONSIDERACIONES
+
+- Los datos no se sincronizan entre dispositivos.
+- Borrar los datos del navegador puede eliminar la información guardada.
+- Conviene exportar periódicamente los ciclos como respaldo JSON.
+- No se encontraron backend, base de datos remota ni pruebas automatizadas
+  dentro del proyecto.
